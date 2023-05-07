@@ -14,7 +14,7 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-application     blockMesh;
+application     blockPolyMesh;
 
 startFrom       startTime;
 

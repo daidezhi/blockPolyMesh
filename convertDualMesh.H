@@ -1,5 +1,12 @@
 Info<< nl << "Converting the dual of the tet mesh" << endl;
 
+const scalar featureAngle(args.get<scalar>(1));
+const scalar minCos(Foam::cos(degToRad(featureAngle)));
+
+Info<< "Feature:" << featureAngle << endl
+    << "minCos :" << minCos
+    << endl;
+
 {
     //const word oldInstance(mesh.pointsInstance());
 
@@ -16,13 +23,6 @@ Info<< nl << "Converting the dual of the tet mesh" << endl;
             isBoundaryEdge.set(fEdges[i]);
         }
     }
-
-    const scalar featureAngle(args.get<scalar>(1));
-    const scalar minCos(Foam::cos(degToRad(featureAngle)));
-
-    Info<< "Feature:" << featureAngle << endl
-        << "minCos :" << minCos
-        << endl;
 
     const bool splitAllFaces(args.found("splitAllFaces"));
     if (splitAllFaces)
@@ -98,6 +98,8 @@ Info<< nl << "Converting the dual of the tet mesh" << endl;
 
     // Update fields
     //mesh.updateMesh(map());
+
+    #include "combinePatchFaces.H"
 }
 
 

@@ -78,6 +78,10 @@ Usage
 #include "foamVtkSurfaceWriter.H"
 #include "attachPolyTopoChanger.H"
 #include "polyTopoChange.H"
+#include "polyModifyFace.H"
+#include "polyAddFace.H"
+#include "combineFaces.H"
+#include "removePoints.H"
 #include "tetDecomposer.H"
 #include "cyclicPolyPatch.H"
 #include "cellSet.H"
@@ -318,6 +322,271 @@ void simpleMarkFeatures
 }
 
 
+// Merge faces on the same patch (usually from exposing refinement)
+// Can undo merges if these cause problems.
+label mergePatchFaces
+(
+    const scalar minCos,
+    const scalar concaveSin,
+    const Time& runTime,
+    polyMesh& mesh
+)
+{
+    // Patch face merging engine
+    combineFaces faceCombiner(mesh);
+
+    // Get all sets of faces that can be merged
+    labelListList allFaceSets(faceCombiner.getMergeSets(minCos, concaveSin));
+
+    label nFaceSets = returnReduce(allFaceSets.size(), sumOp<label>());
+
+    Info<< "Merging " << nFaceSets << " sets of faces." << endl;
+
+    if (nFaceSets > 0)
+    {
+        // Store the faces of the face sets
+        List<faceList> allFaceSetsFaces(allFaceSets.size());
+        forAll(allFaceSets, seti)
+        {
+            allFaceSetsFaces[seti] = UIndirectList<face>
+            (
+                mesh.faces(),
+                allFaceSets[seti]
+            );
+        }
+
+        autoPtr<mapPolyMesh> map;
+        {
+            // Topology changes container
+            polyTopoChange meshMod(mesh);
+
+            // Merge all faces of a set into the first face of the set.
+            faceCombiner.setRefinement(allFaceSets, meshMod);
+
+            // Change the mesh (no inflation)
+            map = meshMod.changeMesh(mesh, false, true);
+
+            // Update fields
+            mesh.updateMesh(map());
+
+            // Move mesh (since morphing does not do this)
+            if (map().hasMotionPoints())
+            {
+                mesh.movePoints(map().preMotionPoints());
+            }
+            else
+            {
+                // Delete mesh volumes. No other way to do this?
+                mesh.clearOut();
+            }
+        }
+
+
+        // Check for errors and undo
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~
+
+        // Faces in error.
+        labelHashSet errorFaces;
+
+        mesh.checkFacePyramids(false, -SMALL, &errorFaces);
+
+        // Sets where the master is in error
+        labelHashSet errorSets;
+
+        forAll(allFaceSets, seti)
+        {
+            label newMasterI = map().reverseFaceMap()[allFaceSets[seti][0]];
+
+            if (errorFaces.found(newMasterI))
+            {
+                errorSets.insert(seti);
+            }
+        }
+        label nErrorSets = returnReduce(errorSets.size(), sumOp<label>());
+
+        Info<< "Detected " << nErrorSets
+            << " error faces on boundaries that have been merged."
+            << " These will be restored to their original faces."
+            << endl;
+
+        if (nErrorSets)
+        {
+            // Renumber stored faces to new vertex numbering.
+            for (const label seti : errorSets)
+            {
+                faceList& setFaceVerts = allFaceSetsFaces[seti];
+
+                forAll(setFaceVerts, i)
+                {
+                    inplaceRenumber(map().reversePointMap(), setFaceVerts[i]);
+
+                    // Debug: check that all points are still there.
+                    forAll(setFaceVerts[i], j)
+                    {
+                        label newVertI = setFaceVerts[i][j];
+
+                        if (newVertI < 0)
+                        {
+                            FatalErrorInFunction
+                                << "In set:" << seti << " old face labels:"
+                                << allFaceSets[seti] << " new face vertices:"
+                                << setFaceVerts[i] << " are unmapped vertices!"
+                                << abort(FatalError);
+                        }
+                    }
+                }
+            }
+
+
+            // Topology changes container
+            polyTopoChange meshMod(mesh);
+
+
+            // Restore faces
+            for (const label seti : errorSets)
+            {
+                const labelList& setFaces = allFaceSets[seti];
+                const faceList& setFaceVerts = allFaceSetsFaces[seti];
+
+                label newMasterI = map().reverseFaceMap()[setFaces[0]];
+
+                // Restore. Get face properties.
+
+                label own = mesh.faceOwner()[newMasterI];
+                label zoneID = mesh.faceZones().whichZone(newMasterI);
+                bool zoneFlip = false;
+                if (zoneID >= 0)
+                {
+                    const faceZone& fZone = mesh.faceZones()[zoneID];
+                    zoneFlip = fZone.flipMap()[fZone.whichFace(newMasterI)];
+                }
+                label patchID = mesh.boundaryMesh().whichPatch(newMasterI);
+
+                Pout<< "Restoring new master face " << newMasterI
+                    << " to vertices " << setFaceVerts[0] << endl;
+
+                // Modify the master face.
+                meshMod.setAction
+                (
+                    polyModifyFace
+                    (
+                        setFaceVerts[0],                // original face
+                        newMasterI,                     // label of face
+                        own,                            // owner
+                        -1,                             // neighbour
+                        false,                          // face flip
+                        patchID,                        // patch for face
+                        false,                          // remove from zone
+                        zoneID,                         // zone for face
+                        zoneFlip                        // face flip in zone
+                    )
+                );
+
+
+                // Add the previously removed faces
+                for (label i = 1; i < setFaces.size(); ++i)
+                {
+                    Pout<< "Restoring removed face " << setFaces[i]
+                        << " with vertices " << setFaceVerts[i] << endl;
+
+                    meshMod.setAction
+                    (
+                        polyAddFace
+                        (
+                            setFaceVerts[i],        // vertices
+                            own,                    // owner,
+                            -1,                     // neighbour,
+                            -1,                     // masterPointID,
+                            -1,                     // masterEdgeID,
+                            newMasterI,             // masterFaceID,
+                            false,                  // flipFaceFlux,
+                            patchID,                // patchID,
+                            zoneID,                 // zoneID,
+                            zoneFlip                // zoneFlip
+                        )
+                    );
+                }
+            }
+
+            // Change the mesh (no inflation)
+            map = meshMod.changeMesh(mesh, false, true);
+
+            // Update fields
+            mesh.updateMesh(map());
+
+            // Move mesh (since morphing does not do this)
+            if (map().hasMotionPoints())
+            {
+                mesh.movePoints(map().preMotionPoints());
+            }
+            else
+            {
+                // Delete mesh volumes. No other way to do this?
+                mesh.clearOut();
+            }
+        }
+    }
+    else
+    {
+        Info<< "No faces merged ..." << endl;
+    }
+
+    return nFaceSets;
+}
+
+
+// Remove points not used by any face or points used by only two faces where
+// the edges are in line
+label mergeEdges(const scalar minCos, polyMesh& mesh)
+{
+    Info<< "Merging all points on surface that" << nl
+        << "- are used by only two boundary faces and" << nl
+        << "- make an angle with a cosine of more than " << minCos
+        << "." << nl << endl;
+
+    // Point removal analysis engine
+    removePoints pointRemover(mesh);
+
+    // Count usage of points
+    boolList pointCanBeDeleted;
+    label nRemove = pointRemover.countPointUsage(minCos, pointCanBeDeleted);
+
+    if (nRemove > 0)
+    {
+        Info<< "Removing " << nRemove
+            << " straight edge points ..." << endl;
+
+        // Topology changes container
+        polyTopoChange meshMod(mesh);
+
+        pointRemover.setRefinement(pointCanBeDeleted, meshMod);
+
+        // Change the mesh (no inflation)
+        autoPtr<mapPolyMesh> map = meshMod.changeMesh(mesh, false, true);
+
+        // Update fields
+        mesh.updateMesh(map());
+
+        // Move mesh (since morphing does not do this)
+        if (map().hasMotionPoints())
+        {
+            mesh.movePoints(map().preMotionPoints());
+        }
+        else
+        {
+            // Delete mesh volumes. No other way to do this?
+            mesh.clearOut();
+        }
+    }
+    else
+    {
+        Info<< "No straight edges simplified and no points removed ..." << endl;
+    }
+
+    return nRemove;
+}
+
+
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 
@@ -349,6 +618,13 @@ int main(int argc, char *argv[])
     (
         "featureAngle",
         "in degrees [0-180]"
+    );
+
+    argList::addOption
+    (
+        "concaveAngle",
+        "degrees",
+        "Specify concave angle [0..180] (default: 30 degrees)"
     );
 
     argList::addBoolOption
