@@ -336,7 +336,7 @@ int main(int argc, char *argv[])
         "Force verbose output. (Can be used multiple times)"
     );
 
-    argList::addOption("dict", "file", "Alternative blockPolyMeshDict");
+    argList::addOption("dict", "file", "Alternative blockMeshDict");
 
     // argList::addOption
     // (

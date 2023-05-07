@@ -17,13 +17,16 @@ Info<< nl << "Decomposing hexahedrons using the decomposition type of "
     << tetDecomposer::decompositionTypeNames.get(decompType)
     << endl;
 
-tetDecomposer tetMesh(mesh);
+{
+    tetDecomposer tetMesh(mesh);
 
-polyTopoChange meshMod(mesh);
-bitSet decomposeCell(identity(mesh.nCells(), 0));
+    polyTopoChange meshMod(mesh);
+    bitSet decomposeCell(identity(mesh.nCells()));
 
-tetMesh.setRefinement(decompType, decomposeCell, meshMod);
+    tetMesh.setRefinement(decompType, decomposeCell, meshMod);
 
-meshMod.changeMesh(mesh, false);
+    meshMod.changeMesh(mesh, false);
+
+}
 
 #include "printMeshSummary.H"

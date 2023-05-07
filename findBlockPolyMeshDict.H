@@ -16,7 +16,7 @@ Description
 \*---------------------------------------------------------------------------*/
 
 // Search for the appropriate blockMesh dictionary
-const word dictName("blockPolyMeshDict");
+const word dictName("blockMeshDict");
 
 autoPtr<IOdictionary> meshDictPtr;
 
