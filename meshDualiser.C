@@ -994,16 +994,6 @@ void Foam::meshDualiser::setRefinement
     //      - walk around boundary point.
 
 
-
-    autoPtr<OFstream> dualCcStr;
-    if (debug)
-    {
-        dualCcStr.reset(new OFstream("dualCc.obj"));
-        Pout<< "Dumping centres of dual cells to " << dualCcStr().name()
-            << endl;
-    }
-
-
     // Dual cells (from points)
     // ~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -1036,10 +1026,6 @@ void Foam::meshDualiser::setRefinement
             -1,     //masterCellID,
             -1      //zoneID
         );
-        if (dualCcStr)
-        {
-            meshTools::writeOBJ(*dualCcStr, mesh_.points()[pointi]);
-        }
     }
 
     // feature points that become multiple cells
@@ -1080,14 +1066,6 @@ void Foam::meshDualiser::setRefinement
                 -1,                                         //masterCellID
                 mesh_.cellZones().whichZone(pCells[pCelli]) //zoneID
             );
-            if (dualCcStr)
-            {
-                meshTools::writeOBJ
-                (
-                    *dualCcStr,
-                    0.5*(mesh_.points()[pointi]+cellCentres[pCells[pCelli]])
-                );
-            }
         }
     }
     // Normal points
@@ -1104,11 +1082,6 @@ void Foam::meshDualiser::setRefinement
                 -1,     //masterCellID,
                 -1      //zoneID
             );
-
-            if (dualCcStr)
-            {
-                meshTools::writeOBJ(*dualCcStr, mesh_.points()[pointi]);
-            }
         }
     }
 
@@ -1265,14 +1238,6 @@ void Foam::meshDualiser::setRefinement
     }
 
 
-    // Check for duplicate points
-    if (debug)
-    {
-        dumpPolyTopoChange(meshMod, "generatedPoints_");
-        checkPolyTopoChange(meshMod);
-    }
-
-
     // Now we have all points and cells
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     //  - pointToDualCells_ : per point a single dualCell or multiple dualCells
@@ -1319,11 +1284,6 @@ void Foam::meshDualiser::setRefinement
                 );
             }
         }
-    }
-
-    if (debug)
-    {
-        dumpPolyTopoChange(meshMod, "generatedFacesFromEdges_");
     }
 
     // Create faces from feature faces. These can be internal or external faces.
@@ -1380,11 +1340,6 @@ void Foam::meshDualiser::setRefinement
         }
     }
 
-    if (debug)
-    {
-        dumpPolyTopoChange(meshMod, "generatedFacesFromFeatFaces_");
-    }
-
 
     // Create boundary faces. Every boundary point has one or more dualcells.
     // These need to be closed.
@@ -1427,11 +1382,6 @@ void Foam::meshDualiser::setRefinement
                 }
             }
         }
-    }
-
-    if (debug)
-    {
-        dumpPolyTopoChange(meshMod, "generatedFacesFromBndFaces_");
     }
 }
 

@@ -1,0 +1,126 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  v2212                                 |
+|   \\  /    A nd           | Website:  www.openfoam.com                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      blockMeshDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+scale   1.0;
+verbose no;
+
+// Geometric parameters
+dc   #eval{ ((3.0+2.0*sqrt(3.0))/(3.0)) };        //- Cylinder diameter
+rc   #eval{ 0.5 * $dc };                          //- Cylinder radius
+zbc  -1.0;                                        //- Cylinder bottom z
+ztc   1.5;                                        //- Cylinder top z
+s    #eval{ 0.5 * $rc };                          //- Inner square side half
+sc   #eval{ 0.571428 * $rc };                     //- Inner square side curvature
+
+// Divisions in x/y/z and radial directions
+ns   6;    //- Number of cells at inner square
+ni   3;    //- Number of cells between inner square and circle
+nz   13;    //- Number of cells in the cylinder height
+
+
+vertices
+(
+    ( $s -$s $zbc) //- Vertex s0b = 0, b means bottom
+    (-$s -$s $zbc) //- Vertex s1b = 1
+    (-$s  $s $zbc) //- Vertex s2b = 2
+    ( $s  $s $zbc) //- Vertex s3b = 3
+
+    (#eval{$rc*cos(degToRad( -45))} #eval{$rc*sin(degToRad( -45))} $zbc) //- Vertex r0b = 4
+    (#eval{$rc*cos(degToRad(-135))} #eval{$rc*sin(degToRad(-135))} $zbc) //- Vertex r1b = 5
+    (#eval{$rc*cos(degToRad( 135))} #eval{$rc*sin(degToRad( 135))} $zbc) //- Vertex r2b = 6
+    (#eval{$rc*cos(degToRad(  45))} #eval{$rc*sin(degToRad(  45))} $zbc) //- Vertex r3b = 7
+
+    ( $s -$s $ztc) //- Vertex s0t = 8, t means top
+    (-$s -$s $ztc) //- Vertex s1t = 9
+    (-$s  $s $ztc) //- Vertex s2t = 10
+    ( $s  $s $ztc) //- Vertex s3t = 11
+
+    (#eval{$rc*cos(degToRad( -45))} #eval{$rc*sin(degToRad( -45))} $ztc) //- Vertex r0t = 12
+    (#eval{$rc*cos(degToRad(-135))} #eval{$rc*sin(degToRad(-135))} $ztc) //- Vertex r1t = 13
+    (#eval{$rc*cos(degToRad( 135))} #eval{$rc*sin(degToRad( 135))} $ztc) //- Vertex r2t = 14
+    (#eval{$rc*cos(degToRad(  45))} #eval{$rc*sin(degToRad(  45))} $ztc) //- Vertex r3t = 15
+);
+
+blocks
+(
+    hex (1 0 3 2  9  8 11 10) ($ns $ns $nz) grading (1 1 1)  //- block0
+    hex (0 4 7 3  8 12 15 11) ($ni $ns $nz) grading (1 1 1)  //- block1
+    hex (3 7 6 2 11 15 14 10) ($ni $ns $nz) grading (1 1 1)  //- block2
+    hex (2 6 5 1 10 14 13  9) ($ni $ns $nz) grading (1 1 1)  //- block3
+    hex (1 5 4 0  9 13 12  8) ($ni $ns $nz) grading (1 1 1)  //- block4
+);
+
+edges
+(
+    //Circle edges
+    arc 7 4 (#eval{$rc*cos(degToRad(  0))} #eval{$rc*sin(degToRad(  0))} $zbc)
+    arc 4 5 (#eval{$rc*cos(degToRad(-90))} #eval{$rc*sin(degToRad(-90))} $zbc)
+    arc 5 6 (#eval{$rc*cos(degToRad(180))} #eval{$rc*sin(degToRad(180))} $zbc)
+    arc 6 7 (#eval{$rc*cos(degToRad( 90))} #eval{$rc*sin(degToRad( 90))} $zbc)
+
+    //Circle edges
+    arc 15 12 (#eval{$rc*cos(degToRad(  0))} #eval{$rc*sin(degToRad(  0))} $ztc)
+    arc 12 13 (#eval{$rc*cos(degToRad(-90))} #eval{$rc*sin(degToRad(-90))} $ztc)
+    arc 13 14 (#eval{$rc*cos(degToRad(180))} #eval{$rc*sin(degToRad(180))} $ztc)
+    arc 14 15 (#eval{$rc*cos(degToRad( 90))} #eval{$rc*sin(degToRad( 90))} $ztc)
+
+    arc 3 0 ( $sc    0 $zbc)
+    arc 0 1 (   0 -$sc $zbc)
+    arc 1 2 (-$sc    0 $zbc)
+    arc 2 3 (   0  $sc $zbc)
+
+    arc 11  8 ( $sc    0 $ztc)
+    arc  8  9 (   0 -$sc $ztc)
+    arc  9 10 (-$sc    0 $ztc)
+    arc 10 11 (   0  $sc $ztc)
+);
+
+
+boundary
+(
+    side
+    {
+        type wall;
+        faces
+        (
+            (4 7 15 12)
+            (5 4 12 13)
+            (6 5 13 14)
+            (7 6 14 15)
+        );
+    }
+
+    topAndBottom
+    {
+        type wall;
+        faces
+        (
+            ( 3  0  1  2)
+            ( 3  7  4  0)
+            ( 2  6  7  3)
+            ( 1  5  6  2)
+            ( 0  4  5  1)
+            (11 10  9  8)
+            (11  8 12 15)
+            (10 11 15 14)
+            ( 9 10 14 13)
+            ( 8  9 13 12)
+        );
+    }
+);
+
+
+// ************************************************************************* //

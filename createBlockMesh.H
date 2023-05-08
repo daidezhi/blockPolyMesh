@@ -7,7 +7,7 @@ const blockMesh::mergeStrategy strategy
   : blockMesh::DEFAULT_MERGE
 );
 
-blockMesh blocks(meshDict, regionName, strategy, args.verbose());
+blockMesh blocks(meshDict, regionName, strategy, false);
 
 if (!blocks.valid())
 {
@@ -33,6 +33,16 @@ polyMesh& mesh(*meshPtr);
 
 // Handle cyclic patches
 #include "handleCyclicPatches.H"
+
+if (args.found("write-vtk"))
+{
+    Info<< nl;
+    #include "blockMeshVTK.H"
+
+    Info<< "\nEnd\n" << endl;
+
+    return 0;
+}
 
 // Set the precision of the points data to 10
 IOstream::defaultPrecision(max(10u, IOstream::defaultPrecision()));
