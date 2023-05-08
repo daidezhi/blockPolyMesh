@@ -11,7 +11,7 @@
 * supports cell size grading
 * supports curved block edges
 
-Same with the `blockMesh` mesher, `blockPolyMesh` is well suited to simple geometries that can be described by a few blocks, but challenging to apply to cases with a large number of blocks due to book-keeping requirements, *i.e.*, the need to manage point connectivity and ordering.
+Same as the `blockMesh` mesher, `blockPolyMesh` is well suited to simple geometries that can be described by a few blocks, but challenging to apply to cases with a large number of blocks due to book-keeping requirements, *i.e.*, the need to manage point connectivity and ordering.
 
 ## Compatibility
 
