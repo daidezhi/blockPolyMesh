@@ -1,5 +1,7 @@
 # blockPolyMesh
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.11212395.svg)](https://doi.org/10.5281/zenodo.11212395)
+
 ## Overview
 
 `blockPolyMesh` is a structured polyhedral mesh generator, which is based on `blockMesh`. The $n$ cells of the structured hexahedral mesh are decomposed into $24n$ tetrahedrons and then converted to polyhedra following the algorithm in `polyDualMesh`.
